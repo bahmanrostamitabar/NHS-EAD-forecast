@@ -1,0 +1,105 @@
+---
+title: "Random Forest Direct Forecasting Results"
+format: html
+toc: true
+---
+
+## Feature Importance by Horizon
+
+
+```{python}
+#| echo: false
+#| fig-width: 100%
+#| fig-align: center
+#| fig-height: 100%
+import pandas as pd
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+
+
+avg_imp_df = pd.read_csv("results/feature_importance_by_horizon_rf.csv")
+
+
+
+# Example expected columns:
+# avg_imp_df.columns -> ['feature', 'importance', 'horizon']
+
+# Optional: keep only top N features within each horizon
+top_n = 25
+plot_df = (
+    avg_imp_df
+    .sort_values(['horizon', 'importance'], ascending=[True, False])
+    .groupby('horizon')
+    .head(top_n)
+    .copy()
+)
+
+horizons = sorted(plot_df['horizon'].unique())
+
+fig = go.Figure()
+
+for i, h in enumerate(horizons):
+    df_h = (
+        plot_df[plot_df['horizon'] == h]
+        .sort_values('importance', ascending=True)  # ascending for nicer horizontal bars
+    )
+
+    fig.add_trace(
+        go.Bar(
+            x=df_h['importance'],
+            y=df_h['feature'],
+            orientation='h',
+            name=f'Horizon {h}',
+            visible=(i == 0)
+        )
+    )
+
+buttons = []
+for i, h in enumerate(horizons):
+    visible = [False] * len(horizons)
+    visible[i] = True
+
+    buttons.append(
+        dict(
+            label=f'Horizon {h}',
+            method='update',
+            args=[
+                {'visible': visible},
+                {'title': f'Feature importance - Horizon {h}'}
+            ]
+        )
+    )
+
+fig.update_layout(
+    title=f'Feature importance - Horizon {horizons[0]}',
+    updatemenus=[
+        dict(
+            buttons=buttons,
+            direction='down',
+            showactive=True,
+            x=1.02,
+            xanchor='left',
+            y=1,
+            yanchor='top'
+        )
+    ],
+    xaxis_title='Importance',
+    yaxis_title='Feature',
+    height=700,
+    template='plotly_white',
+    margin=dict(l=100, r=40, t=80, b=40)
+)
+
+fig.show()
+
+```
+
+
+## Accuracy
+
+
+```{python}
+#| echo: false
+accuracy_overall = pd.read_csv("results/accuracy_overall.csv")
+accuracy_overall
+```

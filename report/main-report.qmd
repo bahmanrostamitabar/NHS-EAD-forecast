@@ -1,0 +1,281 @@
+---
+title: ""
+
+format:
+  pdf:
+    pdf-engine: lualatex
+    toc: false
+    number-sections: true
+    colorlinks: true
+    geometry: margin=1in
+    fontsize: 10pt
+
+include-in-header:
+  text: |
+    \usepackage{fontspec}
+    \setmainfont[
+      Path = font/Assistant/,  
+      Extension = .ttf,
+      UprightFont = *-Regular,
+      BoldFont    = *-Bold,
+    ]{Assistant}
+
+    \setsansfont[
+      Path = font/Assistant/,
+      Extension = .ttf,
+      UprightFont = *-Regular,
+      BoldFont    = *-Bold
+    ]{Assistant}
+
+    \usepackage{setspace}
+    \onehalfspacing
+
+    % --- logo macro (textpos, mm units) ---
+    \usepackage{graphicx}
+    \usepackage[absolute,overlay]{textpos}
+    \setlength{\TPHorizModule}{1mm}
+    \setlength{\TPVertModule}{1mm}
+
+    \newcommand{\placeLogos}{%
+      \begin{textblock}{120}(12,12)
+        \raggedright
+        \includegraphics[height=12mm,keepaspectratio]{images/cardiff_logo.png}\hspace{6mm}%
+        \includegraphics[height=12mm,keepaspectratio]{images/logo.png}\hspace{3mm}%
+      \end{textblock}%
+    }
+    
+    \AtBeginDocument{\placeLogos}
+    
+
+---
+
+\begin{flushleft}
+\vspace*{10mm}
+{\LARGE\bfseries Forecasting Avoidable Deaths: Method Summary\par}
+\vspace{4mm}
+
+{\normalsize
+\textbf{Bahman Rostami-Tabar}\\
+\texttt{rostami-tabarb@cardiff.ac.uk}\\[1.5mm]
+\textbf{Mustafa Aslan}\\
+\texttt{AslanM@cardiff.ac.uk}\\[1.5mm]
+\textbf{Harsha Halgamuwe Hewage}\\
+\texttt{HalgamuweHewageHR@cardiff.ac.uk}\\[3mm]
+Data Lab for Social Good Research Group, Cardiff Business School\\
+Cardiff University, United Kingdom
+}
+\vspace{6mm}
+\end{flushleft}
+
+## Introduction
+
+Our objective was to forecast estimated avoidable deaths (EAD) over the next 10 days. The main challenge was that the data contained many covariates from different operational sources, with different meanings, coverage levels, and measurement types, and temporal and cross-sectional granularities. Therefore, before modelling, we focused strongly on understanding and preprocessing the data in a consistent way.
+
+## Data Preprocessing and Aggregation
+
+A key part of our work was deciding how to clean, transform, and aggregate the covariates before modelling. The dataset contained a large number of variables drawn from different NHS operational sources, and we therefore did not treat all columns as generic numerical predictors. Instead, we carefully reviewed the meaning and context of each variable and made preprocessing decisions based on its potential clinical or operational relevance to avoidable deaths.
+
+We strongly believe that this stage requires close collaboration with domain experts and clinicians. Such expertise is essential for understanding what each variable represents, determining which signals are meaningful, and making informed decisions about how data should be aggregated. In our case, this involved not only reconciling different temporal granularities and bringing all information to a common daily level, but also combining measures originating from different organisational units and operational contexts.
+
+While our team did not include a clinician, we have experience developing forecasting models in healthcare settings, which provided useful contextual knowledge. To further inform our decisions, we reviewed relevant healthcare forecasting and operational research literature and supplemented this with evidence gathering and synthesis using tools such as Google Scholar Lab, Claude. These sources helped us identify plausible preprocessing choices and interpret variables in a way that was consistent with existing healthcare forecasting practice.
+
+We also aligned the data to the competition’s midday forecasting setup. Since forecasts are made at midday, we treated each forecasting day as a midday-to-midday window rather than simply using calendar-day totals. This helped ensure that the model only used information that would realistically be available at the time the forecast was produced.
+
+We considered different aggregation rules depending on the type of metric. For volume or count variables, such as numbers of patients, attendances, or waits, summing across relevant groups was usually sensible because the total burden on the system is meaningful. For rates, percentages, averages, or waiting-time measures, summing would not be meaningful, so we used alternative summaries such as means or retained provider-specific values where aggregation could distort interpretation.
+
+Coverage was another important consideration. Some metrics represented a specific provider, site, or pathway, while others represented broader system-level activity. Therefore, we considered whether a variable should be aggregated across the system, kept at organisation level, or excluded if the coverage was not relevant to the target.
+
+For example, we removed child-related variables because they were not directly relevant to the adult avoidable deaths target used in this task. We also treated Bristol Royal Infirmary (BRI) separately where appropriate, because it is a major acute hospital and its activity may have a different relationship with system pressure compared with other providers or community services.
+
+This preprocessing step was important because poor aggregation could create misleading covariates, even if the final forecasting model was strong.
+
+
+## Proposed Final Model
+
+We proposed a Markov-Switching AutoRegressive Regression (MS-ARR) model with two regimes. AR-MSR model captures regime-switching dynamics in time series data by allowing distinct temporal patterns to govern the data in different regimes. This is particularly useful for higly volatile and non-stationary time series data, such as EAD, which may exhibit different patterns during periods of high and low system pressure.
+
+Let $y_t$ denote the EAD at time $t$, and let $X_{tm}$ denote the $m$-th exogenous covariate at time $t$. The MS-ARR model assumes that the observed series $\{y_t\}$ is generated by a latent regime process $\{r_t\}$, where each regime corresponds to a distinct EAD pattern. The hidden regimes capture different patterns of EAD behavior, such as high-pressure and low-pressure states, which may have different relationships with EAD dynamics.
+
+The hidden regime variable $r_t$ takes values in a finite state space $\mathcal{R} = \{1, 2, \ldots, K\},$ where each value corresponds to a distinct EAD regime.
+
+The AR-MSR is specified through a regime-dependent observation model, in which the dynamics of $y_t$ — including its autoregressive structure, covariate effects, and residual variance — are allowed to differ across regimes. Conditional on the regime $r_t = r$, the EAD process evolves according to the regime-specific autoregressive model:
+
+$$
+y_t \mid (r_t = r)
+= \beta_{0}^{(r)} + \sum_{i=1}^{p} \beta_{i}^{(r)} \, y_{t-i} + \sum_{m=p+1}^{M} \beta_{m}^{(r)} X_{tm} + \epsilon_t,
+\qquad
+\epsilon_t \sim \mathcal{N}\!\left(0, \sigma_r^2\right)
+$$ {#eq-ar_msr}
+
+where, $\beta_{0}^{(r)}$ denotes the regime-specific intercept, $\beta_{i}^{(r)}$ the autoregressive coefficients for the $i$-th lag, and $\beta_{m}^{(r)}$ the coefficients for the exogenous variables --- all specific to regime $r$. The residual term $\epsilon_t$ is Gaussian with regime-specific variance $\sigma_r^2$, allowing the model to capture differences in EAD volatility across regimes.
+
+A key structural assumption of the MS-ARR is that the latent regime process $\{r_t\}$ satisfies the Markov property: the probability of the regime at time $t$ depends only on the regime at time $t-1$, and is conditionally independent of all earlier history:
+
+$$
+P(r_t = j \mid r_{1:t-1}) = P(r_t = j \mid r_{t-1}),
+\qquad
+j \in \mathcal{R}, \; t \ge 2.
+$$
+
+Given this structure, the joint likelihood of the observed occupancy time series $O_{1:T} = (O_1, O_2, \ldots, O_T)$ and the corresponding latent regimes $r_{1:T} = (r_1, r_2, \ldots, r_T)$ can be factorized using standard hidden Markov model arguments.
+
+This assumption is both analytically tractable and behaviourally plausible; it implies that transitions between occupancy states depend on the current state alone, not on how long the system has been in that state. Under this structure, the joint likelihood of the observed series $O_{1:T}$ and the latent regimes $r_{1:T}$ factorizes in a form amenable to efficient inference via the EM algorithm, described in the following subsection.
+
+The AR-MSR is fully characterized by the following four components:
+
+1.  ***State space:** The finite set of latent occupancy regimes $\mathcal{R} = \{1, 2, \ldots, K\}$, where each state represents a distinct pattern of occupancy dynamics.
+
+2.  **Transition probability matrix:** Let $p_{ij} = P(r_t = j \mid r_{t-1} = i)$ denote the probability of transitioning from regime $i$ to regime $j$, subject to
+
+$$
+\sum_{j=1}^{K} p_{ij} = 1, \qquad \forall \, i \in \mathcal{R}.
+$$
+
+The full transition dynamics are encoded in the matrix $\mathbf{P} \in \mathbb{R}^{K \times K}$:
+
+$$
+  \mathbf{P} =
+  \begin{pmatrix}
+      p_{11} & \cdots & p_{1K} \\
+      \vdots & \ddots & \vdots \\
+      p_{K1} & \cdots & p_{KK}
+  \end{pmatrix}.
+  $$
+
+3.  **Emission distribution:** The conditional distribution $p(y_t \mid r_t = k)$ induced by the regime-specific autoregressive model defined in Equation\~(\ref{eq-ar_msr}). This component governs how EAD patterns are generated from each latent regime, capturing regime-specific differences in mean level, autoregressive dynamics, and residual variance.
+
+4.  **Initial state distribution:** The vector $\boldsymbol{\pi} = (\pi_1, \pi_2, \ldots, \pi_K)$, where
+
+$$
+  \pi_k = P(r_1 = k), \qquad \sum_{k=1}^{K} \pi_k = 1,
+$$
+
+  specifies the probability of the process beginning in each regime at $t = 1$.
+
+Together, these four components fully determine the joint distribution of the observed EAD series $O_{1:T}$ and the latent regime sequence $r_{1:T}$, providing the foundation for parameter estimation via the EM algorithm described in the following subsection.
+
+### Parameter Estimation
+
+The parameters of the AR-MSR are collected in the vector
+
+$$
+\theta = \{\beta^{(r)}, \sigma_r^2, P, \pi \}_{r \in \mathcal{R}}
+$$
+
+
+and are estimated by maximising the likelihood of the observed occupancy series $O_{1:T} = (O_1, \ldots, O_T)$ via the Expectation--Maximisation (EM) algorithm. The EM algorithm proceeds iteratively, alternating between two steps. In the E-step, the posterior distribution of the latent regime sequence $r_{1:T}$ is computed conditional on the current parameter estimates $\boldsymbol{\theta}^{(k)}$ and the observed data. In the M-step, the parameter vector is updated by maximising the resulting expected complete-data log-likelihood. Convergence is declared when the change in the observed-data log-likelihood between successive iterations falls below a pre-specified tolerance threshold $\varepsilon > 0$. The full algorithmic procedure is summarized in the callout box below.
+
+::: {.callout-note .em-callout icon="false"}
+### EM Algorithm
+
+Let $k$ denote the iteration index. The EM algorithm proceeds as follows:
+
+$$
+\begin{aligned}
+&\textbf{E-step:} \\[4pt]
+&\quad 
+Q(\theta \mid \theta^{(k)}) 
+=
+\mathbb{E}_{\,r_{1:T} \mid y_{1:T},\, \theta^{(k)}} 
+\left[
+\log p(y_{1:T}, r_{1:T} \mid \theta)
+\right]
+\\[14pt]
+&\textbf{M-step:} \\[4pt]
+&\quad 
+\theta^{(k+1)} 
+=
+\arg\max_{\theta}\,
+Q(\theta \mid \theta^{(k)})
+\\[14pt]
+&\textbf{Iterate until convergence:} \\[4pt]
+&\quad 
+\theta^{(0)}
+\;\rightarrow\;
+\text{E-step}
+\;\rightarrow\;
+\text{M-step}
+\;\rightarrow\;
+\theta^{(1)}
+\;\rightarrow\;
+\cdots
+\;\rightarrow\;
+\theta^{(k+1)}
+\end{aligned}
+$$
+:::
+
+### Forecasting with the AR-MSR
+
+Forecasting under the AR-MSR model explicitly accounts for uncertainty in future regime evolution by integrating over all possible regimes, weighted by their predicted probabilities, rather than conditioning on a single predicted regime.
+
+Let $P(r_T = i \mid O_{1:T})$ denote the filtered probability of being in regime $i$ at time $T$, obtained from the final E-step of the EM algorithm. The $h$-step-ahead regime probabilities are then propagated forward recursively using the estimated transition matrix $\mathbf{P} = (p_{ij})$:
+
+$$
+P(r_{T+h} = j \mid y_{1:T})
+=
+\sum_{i=1}^{K}
+P(r_{T+h-1} = i \mid y_{1:T}) \, p_{ij},
+\qquad h \ge 1.
+$$
+
+This recursion propagates regime uncertainty forward in time under the Markov assumption, with uncertainty growing as the horizon $h$ increases.
+
+Conditional on regime $r_{T+h} = r$, the $h$-step-ahead occupancy forecast is obtained from the corresponding regime-specific autoregressive model:
+
+$$
+\hat{y}_{T+h}^{(r)}
+=
+\beta_{0}^{(r)}
++
+\sum_{i=1}^{p}
+\beta_{i}^{(r)} \, y_{T+h-i}
++
+\sum_{m=1}^{M}
+\beta_{p+m}^{(r)} \, X_{T+h,m},
+$$
+
+where lagged EAD values $O_{T+h-i}$ are replaced by their observed values when $h \leq i$ and by their recursively forecasted counterparts when $h > i$.
+
+The final point forecast at horizon $h$ is then computed as a probability-weighted average across all regimes:
+
+$$
+\hat{y}_{T+h}
+=
+\sum_{r=1}^{K}
+P(r_{T+h} = r \mid y_{1:T}) \, \hat{y}_{T+h}^{(r)}.
+$$
+
+### What variables were included in the model?
+
+
+### Forecasting setup and parameter tuning 
+
+We reserved the final 182 days as a hold-out test set and used the remaining data for training. To tune hyperparameters, we created rolling validation sets over the last 262 days of the training data, rolling forward the training window by 10 days at a time. This setup allowed us to evaluate model performance on multiple validation sets that reflect the temporal structure of the data, while keeping the final test set completely unseen until the end. For each model, we identified the optimal lag specifications and transformation parameters based on validation performance, then evaluated these selected models on the hold-out test set to compare forecasting accuracy.
+
+### Other Benchmark Models We Tried
+
+We tried a range of models to understand what type of approach worked best.
+
+We benchmarked the final model against several alternatives: Linear Regression, lasso, Ridge, Elastic net, LightGBM, XGBoost, Catboost, Random Forest, Generalised Linear Models with Negative Binomial, Poisson, and Gamma distributions, Generalised Additive Models with Gamma and Lognomal distributions, Prophet, TBATS, Chronos-2, TimesFM, and simple weekday-median models with recent level adjustment. For the covariate-based models, we tested both a single model for horizons 1-10 and separate models for horizons 1-5 and 6-10, reflecting the two evaluation ranges used in the competition. These tests helped us compare covariate-based, nonlinear, foundation-model, and simple seasonal baselines before selecting the final Markov-Switching AutoRegressive Regression (MS-ARR) model submission.
+
+### Selected Variables for the MS-ARR
+
+- Target lags: We included lags of the target variable (EAD) to capture autoregressive dynamics and temporal dependencies. The optimal lags were determined via validation to be 4, 8, and 10 days.
+
+- Rolling statistics: To capture recent trends and volatility in EAD, we evaluated various rolling windows and metrics. The optimal configuration was a 49-day rolling 20th percentile (0.2 quantile).
+
+- Calendar features: We included day-of-week, month-of-year, and public holiday dummy variables to capture discrete seasonal variations and institutional calendar effects.
+
+- Operational anomaly indicators: We included binary indicators for 15 specific dates identified as extreme outliers. This allows the model to isolate sudden, non-systematic spikes or drops in EAD without distorting the underlying parameters.
+
+- Cyclical features: To supplement the discrete monthly dummies, we incorporated continuous Fourier terms to capture smooth annual seasonality. Validation indicated that a single sine term with a 365-day period optimizes performance, efficiently mapping day-of-month progression within the yearly cycle using fewer degrees of freedom.
+
+### Pipeline
+
+We implemented a pipeline that allowed us to easily test different preprocessing strategies, model specifications, and forecasting setups. The pipeline included steps for data cleaning, feature engineering, model training, hyperparameter tuning, and evaluation. This modular design enabled us to systematically compare different approaches and ensure that our final model selection was based on robust empirical evidence from the validation sets.
+
+
+## Conclusion
+
+Our main finding was that the strongest signal came from the target series itself. Models using target lags, rolling statistics, and calendar features were difficult to improve with the wider NHS covariate set. This suggests that the covariates may only add value if they are aggregated and interpreted with stronger clinical and operational domain knowledge. Therefore, future work should focus not only on model choice, but also on validating the covariate construction process with domain experts. Our final approach combines empirical model comparison with transparent preprocessing assumptions.
