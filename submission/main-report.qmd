@@ -246,8 +246,6 @@ $$
 P(r_{T+h} = r \mid y_{1:T}) \, \hat{y}_{T+h}^{(r)}.
 $$
 
-### What variables were included in the model?
-
 
 ### Forecasting setup and parameter tuning 
 
