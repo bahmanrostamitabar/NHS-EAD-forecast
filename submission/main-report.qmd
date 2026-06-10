@@ -117,13 +117,13 @@ P(r_t = j \mid r_{1:t-1}) = P(r_t = j \mid r_{t-1}),
 j \in \mathcal{R}, \; t \ge 2.
 $$
 
-Given this structure, the joint likelihood of the observed occupancy time series $O_{1:T} = (O_1, O_2, \ldots, O_T)$ and the corresponding latent regimes $r_{1:T} = (r_1, r_2, \ldots, r_T)$ can be factorized using standard hidden Markov model arguments.
+Given this structure, the joint likelihood of the observed EAD time series $y_{1:T} = (y_1, y_2, \ldots, y_T)$ and the corresponding latent regimes $r_{1:T} = (r_1, r_2, \ldots, r_T)$ can be factorized using standard hidden Markov model arguments.
 
-This assumption is both analytically tractable and behaviourally plausible; it implies that transitions between occupancy states depend on the current state alone, not on how long the system has been in that state. Under this structure, the joint likelihood of the observed series $O_{1:T}$ and the latent regimes $r_{1:T}$ factorizes in a form amenable to efficient inference via the EM algorithm, described in the following subsection.
+This assumption is both analytically tractable and behaviourally plausible; it implies that transitions between EAD states depend on the current state alone, not on how long the system has been in that state. Under this structure, the joint likelihood of the observed series $y_{1:T}$ and the latent regimes $r_{1:T}$ factorizes in a form amenable to efficient inference via the EM algorithm, described in the following subsection.
 
 The AR-MSR is fully characterized by the following four components:
 
-1.  ***State space:** The finite set of latent occupancy regimes $\mathcal{R} = \{1, 2, \ldots, K\}$, where each state represents a distinct pattern of occupancy dynamics.
+1.  **State space:** The finite set of latent EAD regimes $\mathcal{R} = \{1, 2, \ldots, K\}$, where each state represents a distinct pattern of EAD dynamics.
 
 2.  **Transition probability matrix:** Let $p_{ij} = P(r_t = j \mid r_{t-1} = i)$ denote the probability of transitioning from regime $i$ to regime $j$, subject to
 
@@ -152,7 +152,7 @@ $$
 
   specifies the probability of the process beginning in each regime at $t = 1$.
 
-Together, these four components fully determine the joint distribution of the observed EAD series $O_{1:T}$ and the latent regime sequence $r_{1:T}$, providing the foundation for parameter estimation via the EM algorithm described in the following subsection.
+Together, these four components fully determine the joint distribution of the observed EAD series $y_{1:T}$ and the latent regime sequence $r_{1:T}$, providing the foundation for parameter estimation via the EM algorithm described in the following subsection.
 
 ### Parameter Estimation
 
@@ -163,7 +163,7 @@ $$
 $$
 
 
-and are estimated by maximising the likelihood of the observed occupancy series $O_{1:T} = (O_1, \ldots, O_T)$ via the Expectation--Maximisation (EM) algorithm. The EM algorithm proceeds iteratively, alternating between two steps. In the E-step, the posterior distribution of the latent regime sequence $r_{1:T}$ is computed conditional on the current parameter estimates $\boldsymbol{\theta}^{(k)}$ and the observed data. In the M-step, the parameter vector is updated by maximising the resulting expected complete-data log-likelihood. Convergence is declared when the change in the observed-data log-likelihood between successive iterations falls below a pre-specified tolerance threshold $\varepsilon > 0$. The full algorithmic procedure is summarized in the callout box below.
+and are estimated by maximising the likelihood of the observed EAD series $y_{1:T} = (y_1, \ldots, y_T)$ via the Expectation--Maximisation (EM) algorithm. The EM algorithm proceeds iteratively, alternating between two steps. In the E-step, the posterior distribution of the latent regime sequence $r_{1:T}$ is computed conditional on the current parameter estimates $\boldsymbol{\theta}^{(k)}$ and the observed data. In the M-step, the parameter vector is updated by maximising the resulting expected complete-data log-likelihood. Convergence is declared when the change in the observed-data log-likelihood between successive iterations falls below a pre-specified tolerance threshold $\varepsilon > 0$. The full algorithmic procedure is summarized in the callout box below.
 
 ::: {.callout-note .em-callout icon="false"}
 ### EM Algorithm
@@ -209,7 +209,7 @@ $$
 
 Forecasting under the AR-MSR model explicitly accounts for uncertainty in future regime evolution by integrating over all possible regimes, weighted by their predicted probabilities, rather than conditioning on a single predicted regime.
 
-Let $P(r_T = i \mid O_{1:T})$ denote the filtered probability of being in regime $i$ at time $T$, obtained from the final E-step of the EM algorithm. The $h$-step-ahead regime probabilities are then propagated forward recursively using the estimated transition matrix $\mathbf{P} = (p_{ij})$:
+Let $P(r_T = i \mid y_{1:T})$ denote the filtered probability of being in regime $i$ at time $T$, obtained from the final E-step of the EM algorithm. The $h$-step-ahead regime probabilities are then propagated forward recursively using the estimated transition matrix $\mathbf{P} = (p_{ij})$:
 
 $$
 P(r_{T+h} = j \mid y_{1:T})
@@ -221,7 +221,7 @@ $$
 
 This recursion propagates regime uncertainty forward in time under the Markov assumption, with uncertainty growing as the horizon $h$ increases.
 
-Conditional on regime $r_{T+h} = r$, the $h$-step-ahead occupancy forecast is obtained from the corresponding regime-specific autoregressive model:
+Conditional on regime $r_{T+h} = r$, the $h$-step-ahead EAD forecast is obtained from the corresponding regime-specific autoregressive model:
 
 $$
 \hat{y}_{T+h}^{(r)}
@@ -235,7 +235,7 @@ $$
 \beta_{p+m}^{(r)} \, X_{T+h,m},
 $$
 
-where lagged EAD values $O_{T+h-i}$ are replaced by their observed values when $h \leq i$ and by their recursively forecasted counterparts when $h > i$.
+where lagged EAD values $y_{T+h-i}$ are replaced by their observed values when $h \leq i$ and by their recursively forecasted counterparts when $h > i$.
 
 The final point forecast at horizon $h$ is then computed as a probability-weighted average across all regimes:
 
